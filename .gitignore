@@ -1,3 +1,4 @@
 env/
 TODO.md
 __pycache__
+*.png
