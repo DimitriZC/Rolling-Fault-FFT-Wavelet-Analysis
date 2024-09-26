@@ -8,9 +8,17 @@ from matplotlib import pyplot as plt
 from typing import List, Tuple
 from kurtogram import fast_kurtogram
 
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 
 def Load(file: str) -> Tuple[List]:
+    """This function load information from file and parse informations
+
+    Args:
+        file (str): File Name [.mat]
+
+    Returns:
+        Tuple[List]: signal, sample rate, time, raw file data
+    """
 
     DATA = scipy.io.loadmat(os.path.join('Data', file))
     x = DATA['bearing']['gs'][0][0]
@@ -20,7 +28,18 @@ def Load(file: str) -> Tuple[List]:
     return x, fs, time, DATA
 
 
-def env_spectrum(x, fs, time, ba=0):
+def env_spectrum(x: List[float], fs: float, time: List[float], ba: List[int, int]=0) -> Tuple[List, int]:
+    """This function mocks the 'envspectrum' MATLAB function, calculating the envelope, its spectrum and frequency
+
+    Args:
+        x (List[float]): Signal
+        fs (float): Sample Rate
+        time (List[float]): time [s]
+        ba (List[int, int], optional): Band limits to filter in demod. Defaults to 0.
+
+    Returns:
+        Tuple[List, int]: Envelope Spectrum, Frequency, Envelope Signal
+    """
 
 
     envelope = complex_demod(x, fs, time, ba)
@@ -50,7 +69,20 @@ def env_spectrum(x, fs, time, ba=0):
     return p_env, f_env, x_env
 
 
-def complex_demod(signal, fs, time, ba=0, order=50):
+def complex_demod(signal: List[float], fs: float, time: List[float], ba: List[int, int]=0, order: int=50) -> List[float]:
+    """This function mocks the complex demodulation (demod) used in MATLAB to get the envelope of a signal
+
+    Args:
+        signal (List[float]): Signal on time
+        fs (float): Sample Rate
+        time (List[float]): time [s]
+        ba (List[int, int], optional): Band limits to filter. Defaults to 0.
+        order (int, optional): filter order. Defaults to 50.
+
+    Returns:
+        List[float]: Envelope Signal
+    """
+    
 
     if ba == 0:
         ba = [fs/4, 3/8*fs]
@@ -63,7 +95,16 @@ def complex_demod(signal, fs, time, ba=0, order=50):
 
 
 
-def plot_env_spectrum(x_env, x_raw, time, xlim=[0.04, 0.06]):
+def plot_env_spectrum(x_env: List, x_raw: List, time: List, xlim: Tuple[float, float]=(0.04, 0.06)):
+    """This Function plots the raw signal and its envelope
+
+    Args:
+        x_env (List): Signal Envelope
+        x_raw (List): Signal on time
+        time (List): time [s]
+        xlim (Tuple[float, float], optional): Plot x-axis limits. Defaults to (0.04, 0.06).
+    """
+
 
 
     plt.figure()
@@ -78,7 +119,18 @@ def plot_env_spectrum(x_env, x_raw, time, xlim=[0.04, 0.06]):
     plt.xlabel('Time [s]')
     plt.ylabel('Acceletarion [g]')
 
-def plot_env_spectrum_analysis(f_env, p_env, BP, BPFI=False, BPFO=False, ALL=False):
+def plot_env_spectrum_analysis(f_env: List, p_env: List, BP: Dict, BPFI: bool=False, BPFO: bool=False, ALL: bool=False):
+    """This function plots the envelope Spectrum analysis, evaluating the signal amplitude in the frequency domain
+
+    Args:
+        f_env (List): Frequency domain
+        p_env (List): Envelope Spectrum
+        BP (Dict): File DATA
+        BPFI (bool, optional): Inner Fault Harmonics. Defaults to False.
+        BPFO (bool, optional): Outer Fault Harmonics. Defaults to False.
+        ALL (bool, optional): Inner and Outer Fault Harmonics. Defaults to False.
+    """
+
     
     k = 0
     ncomb = 0
@@ -112,7 +164,16 @@ def plot_env_spectrum_analysis(f_env, p_env, BP, BPFI=False, BPFO=False, ALL=Fal
 
 
 
-def plot_kurtogram(x, fs) -> Tuple[float]:
+def plot_kurtogram(x: List[float], fs: float) -> Tuple[float]:
+    """This function evaluate the kurtosis spectrum and plot the kurtogram
+
+    Args:
+        x (List[float]): Signal array
+        fs (float): Sample Rate
+
+    Returns:
+        Tuple[float]: center frequency and bandwidth
+    """
 
     Kwav, Level_w, freq_w, fc, max_Kurt, bandwidth, level_max = fast_kurtogram(x, fs, 9)   # Center frequency & bandwidth obtained from kurtogram
     minw = np.where(Level_w == level_max)[0][0]
@@ -137,6 +198,16 @@ def plot_kurtogram(x, fs) -> Tuple[float]:
 
 
 def complete_analysis(file: str, BPFO: bool = False, BPFI: bool = False, ALL: bool = False):
+    """This function evaluate the whole analysis, reading, processing, filtering and ploting
+    the results of a file
+
+    Args:
+        file (str): File to be analised
+        BPFO (bool, optional): Outer Fault Harmonics. Defaults to False.
+        BPFI (bool, optional): Inner Fault Harmonics. Defaults to False.
+        ALL (bool, optional): Inner and Outer Fault Harmonics. Defaults to False.
+    """
+
     title = file.split('.')[0]
     std_xlim = [0, 0.1]
     x_raw, f_raw, t_raw, DATA_raw = Load(file)
