@@ -1,9 +1,8 @@
 import os
 import numpy as np
 import scipy.io
-import pywt
 
-from scipy.signal import hilbert, butter, lfilter, firwin
+from scipy.signal import firwin
 from matplotlib import pyplot as plt
 
 from typing import List, Tuple
@@ -21,90 +20,15 @@ def Load(file: str) -> Tuple[List]:
     return x, fs, time, DATA
 
 
-def PSD(f: List, time: List, num: int) -> Tuple[List]:
-
-    dt = abs(time[2] - time[1])
-    n = len(time[:num])
-    fhat = np.fft.fft(f[:num], n)
-    freq = (1/(dt*n))*np.arange(n)
-    psd = fhat*np.conj(fhat) / n
-    L = np.arange(1, np.floor(n/2), dtype='int')
-
-    return freq, psd, L
-
-def plot_psd(freq, psd, L, title=''):
-
-    plt.figure()
-    plt.plot(freq[L], psd[L])
-    plt.xlim(freq[L[0]], freq[L[-1]])
-    plt.xlabel('Freq [Hz]')
-    plt.ylabel('Power Spectral Density')
-    plt.title(f'PSD: {title}')
-
-
-
-
-def Spec(f: List, fs: int, title: str=""):
-
-    plt.figure()
-    plt.title(title)
-    plt.specgram(f, NFFT=1024, Fs=fs, noverlap=120,cmap='jet')
-    plt.colorbar()
-
-
-def wavelet_filter(coefficients, wavelet) -> List:
-    
-    coeff_arr, coeff_slices = pywt.coeffs_to_array(coefficients)
-
-    Csort = np.sort(np.abs(coeff_arr.reshape(-1)))
-
-    keep = 0.05
-
-    thresh = Csort[int(np.floor((1-keep)*len(Csort)))]
-    ind = np.abs(coeff_arr) > thresh
-    Cfilt = coeff_arr * ind # Threshold small indices
-
-    coeffs_filt = pywt.array_to_coeffs(Cfilt,coeff_slices,output_format='wavedec')
-
-    # Plot reconstruction
-    Arecon = pywt.waverec(coeffs_filt,wavelet=wavelet)
-
-    return Arecon
-
-def band_pass(signal, low, high, fs, order=5):
-    nyquist = 0.5*fs
-    low = low / nyquist
-    high = high / nyquist
-
-    bpf_coefficients = firwin(50 + 1, [low, high], pass_zero=False)
-    b, a = butter(order, [low, high], fs=fs, btype='band')
-    return lfilter(bpf_coefficients, 1.0, signal)
-
-
 def env_spectrum(x, fs, time, ba=0):
 
-
-    # analytic_signal = hilbert(x)
-    # envelope = np.abs(analytic_signal)
 
     envelope = complex_demod(x, fs, time, ba)
 
     mean_envelope = np.mean(envelope)
 
-
-
-    # Remove DC bias by subtracting the mean from the envelope
     envelope = envelope - mean_envelope
 
-    # high, _ = hl_envelopes_idx(np.abs(x), dmin=2)
-
-    # envelope = np.abs(x[high])
-    # t_env = t[high]
-
-
-    # y_d = np.gradient(np.abs(x))
-    # analytic_signal = hilbert(y_d)
-    # envelope = np.abs(analytic_signal)
     
     
     f_env = np.fft.fftfreq(len(envelope), d=1/fs)
@@ -113,15 +37,11 @@ def env_spectrum(x, fs, time, ba=0):
     
     x_env = envelope
 
-        # Compute one-sided spectrum. Compensate the amplitude for a two-sided
-    # spectrum. Double all points except DC and nyquist.
     if len(p_env) % 2 != 0:
-        # Odd length two-sided spectrum
         f_env = f_env[1:int((len(f_env) + 1)/2)]
         p_env = p_env[1:int((len(p_env)+1)/2)]
         p_env[2:int(len(p_env))] = 2*p_env[2:int(len(p_env))]
     else:
-        # Even length two-sided spectrum
         f_env = f_env[1:int(len(f_env)/2+1)]
         p_env = p_env[1:int(len(f_env)/2+1)]
         p_env[2:int(len(p_env)-1)] = 2*p_env[2:int(len(p_env)-1)]
@@ -191,38 +111,6 @@ def plot_env_spectrum_analysis(f_env, p_env, BP, BPFI=False, BPFO=False, ALL=Fal
     plt.legend(framealpha=1)
 
 
-def hl_envelopes_idx(s, dmin=1, dmax=1, split=False):
-    """
-    Function from: https://stackoverflow.com/questions/34235530/how-to-get-high-and-low-envelope-of-a-signal
-    
-    Input :
-    s: 1d-array, data signal from which to extract high and low envelopes
-    dmin, dmax: int, optional, size of chunks, use this if the size of the input signal is too big
-    split: bool, optional, if True, split the signal in half along its mean, might help to generate the envelope in some cases
-    Output :
-    lmin,lmax : high/low envelope idx of input signal s
-    """
-
-    # locals min      
-    lmin = (np.diff(np.sign(np.diff(s))) > 0).nonzero()[0] + 1 
-    # locals max
-    lmax = (np.diff(np.sign(np.diff(s))) < 0).nonzero()[0] + 1 
-    
-    if split:
-        # s_mid is zero if s centered around x-axis or more generally mean of signal
-        s_mid = np.mean(s) 
-        # pre-sorting of locals min based on relative position with respect to s_mid 
-        lmin = lmin[s[lmin]<s_mid]
-        # pre-sorting of local max based on relative position with respect to s_mid 
-        lmax = lmax[s[lmax]>s_mid]
-
-    # global min of dmin-chunks of locals min 
-    lmin = lmin[[i+np.argmin(s[lmin[i:i+dmin]]) for i in range(0,len(lmin),dmin)]]
-    # global max of dmax-chunks of locals max 
-    lmax = lmax[[i+np.argmax(s[lmax[i:i+dmax]]) for i in range(0,len(lmax),dmax)]]
-    
-    return lmin,lmax
-
 
 def plot_kurtogram(x, fs) -> Tuple[float]:
 
@@ -272,8 +160,6 @@ def complete_analysis(file: str, BPFO: bool = False, BPFI: bool = False, ALL: bo
 
     low = fc - BW/2
     high = fc + BW/2
-
-    x_filtered = band_pass(np.transpose(x_raw)[0], low, high, f_raw[0])
 
     p_env_filtered, f_env_filtered, x_env_filtered =  env_spectrum(np.transpose(x_raw)[0], f_raw[0], t_raw, ba=[low, high])
 
